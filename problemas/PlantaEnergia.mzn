@@ -166,6 +166,10 @@ constraint forall(j in 1..n, p1, p2 in 1..np where
   ((prod[p1, j] > umbral_alto[p1] /\ prod[p2, j] > umbral_alto[p2]) -> (prod[p1, j] == plantas[p1, 3]))
 );
 
+constraint forall(j in 1..n, p1, p2 in 1..np where plantas[p1, 2] < plantas[p2, 2])(
+  (prod[p1, j] > umbral_alto[p1] /\ prod[p2, j] > 0) -> (prod[p1, j] == plantas[p1, 3])
+);
+
 constraint forall(j in 1..n, p1, p2 in 1..np where
   p1 != p2 /\ plantas[p2, 2] <= plantas[p1, 2]
 )(
@@ -173,7 +177,12 @@ constraint forall(j in 1..n, p1, p2 in 1..np where
 );
 
 constraint forall(j in 1..n, s in 1..m, p in 1..np where pagos[s] > plantas[p, 2])(
-  (vendido[s, j] < demandas[s, j]) -> (prod[p, j] >= umbral_alto[p])
+  ((vendido[s, j] < demandas[s, j]) -> (prod[p, j] >= umbral_alto[p])) /\
+  ((prod[p, j] > umbral_alto[p] /\ vendido[s, j] < demandas[s, j]) -> (prod[p, j] == plantas[p, 3]))
+);
+
+constraint forall(j in 1..n, s in 1..m, p in 1..np where pagos[s] < plantas[p, 2])(
+  (prod[p, j] > 0) -> (vendido[s, j] == min_dem[s, j])
 );
 
 constraint forall(j in 1..n, s1, s2 in 1..m where
@@ -182,7 +191,25 @@ constraint forall(j in 1..n, s1, s2 in 1..m where
   (vendido[s2, j] > min_dem[s2, j]) -> (vendido[s1, j] == demandas[s1, j])
 );
 
-% R5: Proyeccion lineal de Fourier-Motzkin sobre la ganancia neta por nivel de costo c_q
+% R5: Descomposicion diaria de ganancia con proyeccion lineal de Fourier-Motzkin por nivel de costo c_q
+int: MIN_GAN_DIA = min(j in 1..n)(
+  sum(s in 1..m)(min_dem[s, j] * pagos[s]) - sum(i in 1..np)(plantas[i, 3] * plantas[i, 2])
+);
+int: MAX_GAN_DIA = max(j in 1..n)(
+  sum(s in 1..m)(demandas[s, j] * max(0, pagos[s] - C_MIN))
+);
+array[1..n] of var MIN_GAN_DIA..MAX_GAN_DIA: ganancia_dia;
+
+constraint forall(j in 1..n)(
+  ganancia_dia[j] = sum(s in 1..m)(vendido[s, j] * pagos[s]) - sum(i in 1..np)(prod[i, j] * plantas[i, 2]) /\
+  forall(q in 1..np)(
+    ganancia_dia[j] <= sum(s in 1..m)((pagos[s] - plantas[q, 2]) * vendido[s, j])
+                     - sum(i in 1..np)((plantas[i, 2] - plantas[q, 2]) * prod[i, j])
+  )
+);
+
+constraint ganancia = sum(j in 1..n)(ganancia_dia[j]);
+
 constraint forall(q in 1..np)(
   ganancia <= sum(s in 1..m, j in 1..n)((pagos[s] - plantas[q, 2]) * vendido[s, j])
             - sum(i in 1..np, j in 1..n)((plantas[i, 2] - plantas[q, 2]) * prod[i, j])

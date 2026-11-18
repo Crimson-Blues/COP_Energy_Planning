@@ -1,0 +1,27 @@
+% =============================================================================
+% Instancia 06: Parque con 2 centrales Nucleares gemelas (rompimiento S1)
+% np = 4 plantas (2 Nucleares gemelas, Hidro, Termica), m = 4 clientes, n = 6 dias
+% =============================================================================
+
+TYPES = ["Nuclear", "Hidro", "Termica"];
+np = 4;
+
+% [Tipo | Costo ($/MW) | Capacidad maxima diaria (MW)]
+plantas = [| 1, 10, 400
+           | 1, 10, 400
+           | 2, 20, 300
+           | 3, 35, 500 |];
+
+n = 6;
+m = 4;
+
+demandas = [| 300, 350, 320, 360, 340, 300
+            | 250, 280, 300, 260, 280, 240
+            | 200, 220, 240, 250, 220, 200
+            | 150, 150, 140, 130, 160, 160 |];
+
+pagos = [60, 50, 45, 25];
+
+min_prod = 50;
+percent_high = 80;
+max_days_high = [2, 2, 2, 3];

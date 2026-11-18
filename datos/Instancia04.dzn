@@ -1,0 +1,24 @@
+% =============================================================================
+% Instancia 04: Eliminacion de planta (contingencia sin central Nuclear, np = 2)
+% np = 2 plantas (Hidro, Termica), m = 3 clientes, n = 5 dias
+% =============================================================================
+
+TYPES = ["Nuclear", "Hidro", "Termica"];
+np = 2;
+
+% [Tipo | Costo ($/MW) | Capacidad maxima diaria (MW)]
+plantas = [| 2, 18, 300
+           | 3, 28, 500 |];
+
+n = 5;
+m = 3;
+
+demandas = [| 240, 280, 300, 260, 280
+            | 200, 240, 260, 220, 240
+            | 160, 200, 220, 180, 200 |];
+
+pagos = [65, 50, 24];
+
+min_prod = 50;
+percent_high = 80;
+max_days_high = [2, 3];

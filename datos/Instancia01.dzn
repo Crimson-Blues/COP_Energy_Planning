@@ -1,0 +1,25 @@
+% =============================================================================
+% Instancia 01: Demanda moderada con activacion puntual de segunda central
+% np = 3 plantas (Nuclear, Hidro, Termica), m = 3 clientes, n = 4 dias
+% =============================================================================
+
+TYPES = ["Nuclear", "Hidro", "Termica"];
+np = 3;
+
+% [Tipo | Costo ($/MW) | Capacidad maxima diaria (MW)]
+plantas = [| 1, 10, 1000
+           | 2, 20,  300
+           | 3, 30,  500 |];
+
+n = 4;
+m = 3;
+
+demandas = [| 200, 260, 300, 240
+            | 180, 240, 280, 220
+            | 220, 260, 320, 240 |];
+
+pagos = [55, 45, 60];
+
+min_prod = 50;
+percent_high = 80;
+max_days_high = [2, 2, 2];

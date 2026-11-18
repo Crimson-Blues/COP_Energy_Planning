@@ -1,0 +1,27 @@
+% =============================================================================
+% Instancia 05: Expansion del parque generador a np = 4 plantas (incluye Solar)
+% np = 4 plantas (Solar, Nuclear, Hidro, Termica), m = 4 clientes, n = 6 dias
+% =============================================================================
+
+TYPES = ["Nuclear", "Hidro", "Termica", "Solar"];
+np = 4;
+
+% [Tipo | Costo ($/MW) | Capacidad maxima diaria (MW)]
+plantas = [| 4,  8, 250
+           | 1, 12, 600
+           | 2, 20, 300
+           | 3, 34, 450 |];
+
+n = 6;
+m = 4;
+
+demandas = [| 240, 280, 320, 300, 260, 300
+            | 200, 240, 280, 260, 220, 260
+            | 180, 220, 240, 220, 200, 220
+            | 140, 180, 200, 180, 160, 180 |];
+
+pagos = [62, 54, 48, 30];
+
+min_prod = 50;
+percent_high = 80;
+max_days_high = [2, 3, 2, 3];
