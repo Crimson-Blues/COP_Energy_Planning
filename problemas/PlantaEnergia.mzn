@@ -1,127 +1,259 @@
-%Modelado de problema de Plantas de Energía
-% Juan Diego Cárdenas 
-% Junior Cantor Arevalo
-% Cristian David Cabrera Pantoja
+% =============================================================================
+% Taller 2: Programacion por Restricciones (COP)
+% Problema 1: Planificacion de Produccion en Plantas de Energia
+%
+% Integrantes:
+%   - Cristian David Cabrera Pantoja
+%   - Junior Orlando Cantor Arevalo
+%   - Juan Diego Cardenas Mejia
+% =============================================================================
 
-% Importaciones
 include "globals.mzn";
 
-% -------------- Párametros -----------------
-%Tipos de plantas eléctricas
-array[int] of string: TYPES; %Tipos de plantas eléctricas: Ej [Nuclear, Hidroelectrica, Termica]
+% ----------------------------- 1. Parametros ---------------------------------
 
-%Información sobre las centrales eléctricas:
-int: np; %Número de plantas eléctricas en total
-% Tipo de planta | Costo de producción (pesos/MW) | Máxima producción diaria (MW)
+% Catalogo de tipos de centrales electricas
+array[int] of string: TYPES;
+
+% Numero total de plantas electricas en el parque generador
+int: np;
+
+% Matriz de caracteristicas por planta p in 1..np:
+%   Columna 1: Identificador del tipo de planta en TYPES
+%   Columna 2: Costo unitario de produccion c_p ($/MW)
+%   Columna 3: Capacidad maxima de produccion diaria Cap_p (MW)
 array[1..np, 1..3] of int: plantas;
 
-%Información de requerimientos de producción
-int: n; %Número de días a planificar 
-int: m; %Número de clientes de energía
-array[1..m, 1..n] of int: demandas; %Demanda de MW por cliente por día
+% Horizonte de planificacion (dias) y numero de clientes
+int: n;
+int: m;
 
-%Información de pagos
-array[1..m] of int: pagos; %Pago realizado por MW por cada cliente
+% Demanda diaria estimada d_{s,j} (MW) del cliente s in 1..m en el dia j in 1..n
+array[1..m, 1..n] of int: demandas;
 
-%Límites de producción 
-int: min_prod; %Porcentaje mínimo de satisfacción de demanda de cliente por día
+% Pago unitario P_s ($/MW) acordado con cada cliente s in 1..m
+array[1..m] of int: pagos;
 
-% Límites de centrales hidroélectricas
-int: percent_high; %Porcentaje de producción que define una producción de régimen alto
-array[1..np] of int: max_days_high; %Máximo días consecutivos que pueden estar las plantas en régimen alto
-                                    %Para plantas no hidroélectricas este valor es igual a -1.
+% Porcentaje minimo obligatorio G (%) de satisfaccion de demanda por cliente y dia
+int: min_prod;
 
+% Porcentaje H (%) de la capacidad maxima por encima del cual una planta entra en regimen alto
+int: percent_high;
 
-%Valores máximos
+% Numero de dias consecutivos prohibidos en regimen alto R_p para cada central p in 1..np
+array[1..np] of int: max_days_high;
+
+% ------------------- 2. Validacion de Parametros de Entrada ------------------
+
+constraint assert(np >= 1,
+  "Error de entrada: el numero de plantas (np) debe ser al menos 1.");
+constraint assert(n >= 1,
+  "Error de entrada: el numero de dias (n) debe ser al menos 1.");
+constraint assert(m >= 1,
+  "Error de entrada: el numero de clientes (m) debe ser al menos 1.");
+constraint assert(min_prod >= 0 /\ min_prod <= 100,
+  "Error de entrada: min_prod debe pertenecer al rango 0..100.");
+constraint assert(percent_high > 0 /\ percent_high <= 100,
+  "Error de entrada: percent_high debe pertenecer al rango 1..100.");
+
+constraint forall(i in 1..np)(
+  assert(plantas[i, 1] in index_set(TYPES),
+    "Error de entrada: identificador de tipo de planta fuera de TYPES.") /\
+  assert(plantas[i, 2] >= 0,
+    "Error de entrada: el costo de produccion por MW no puede ser negativo.") /\
+  assert(plantas[i, 3] > 0,
+    "Error de entrada: la capacidad maxima diaria debe ser estrictamente positiva.") /\
+  assert(max_days_high[i] == -1 \/ max_days_high[i] >= 1,
+    "Error de entrada: max_days_high debe ser un entero positivo (o -1 si no aplica).")
+);
+
+constraint forall(s in 1..m)(
+  assert(pagos[s] >= 0,
+    "Error de entrada: el pago por MW del cliente no puede ser negativo.") /\
+  forall(j in 1..n)(
+    assert(demandas[s, j] >= 0,
+      "Error de entrada: la demanda diaria no puede ser negativa.")
+  )
+);
+
+% ------------------------ 3. Constantes Derivadas ----------------------------
+
 int: MAX_CAP = max(i in 1..np)(plantas[i, 3]);
 int: MAX_DEM = max(i in 1..m, j in 1..n)(demandas[i, j]);
+int: C_MIN   = min(i in 1..np)(plantas[i, 2]);
 
-% -------------- Variables -----------------
-array[1..np, 1..n] of var 0..MAX_CAP: prod; %Producción de MW producido por día por cada planta
-array[1..m, 1..n] of var 0..MAX_DEM: vendido; %Cantidad de MW vendida por día a cada cliente
+% Demanda minima obligatoria d^{min}_{s,j} = floor(G * d_{s,j} / 100)
+array[1..m, 1..n] of int: min_dem = array2d(1..m, 1..n, [
+  (min_prod * demandas[s, j]) div 100 | s in 1..m, j in 1..n
+]);
 
-%Arreglos de variables booleanas para reificar el cumplimiento de las demandas
-array[1..m, 1..n] of var bool: total;
-array[1..m, 1..n] of var bool: parcial;
+% Umbral maximo de produccion en regimen normal U_p = floor(H * Cap_p / 100)
+array[1..np] of int: umbral_alto = [
+  (percent_high * plantas[i, 3]) div 100 | i in 1..np
+];
 
-%Función objetivo
-var int: ganancia;
+% Cotas teoricas a priori del dominio de la funcion objetivo
+int: MIN_GAN = sum(s in 1..m, j in 1..n)(min_dem[s, j] * pagos[s])
+             - sum(i in 1..np, j in 1..n)(plantas[i, 3] * plantas[i, 2]);
+int: MAX_GAN = sum(s in 1..m, j in 1..n)(demandas[s, j] * max(0, pagos[s] - C_MIN));
 
-% -------------- Restricciones -----------------
-% No se puede vender en total más de lo producido en un día
-constraint forall(j in 1..n)(
-  sum(i in 1..m)(vendido[i, j]) <= sum(i in 1..np)(prod[i, j])
-); 
+% ----------------------- 4. Variables de Decision ----------------------------
 
-%No sobrepasar límites máximos de producción
-constraint forall(i in 1..np, j in 1..n) (
+% Energia producida (MW) por la planta i in 1..np en el dia j in 1..n
+array[1..np, 1..n] of var 0..MAX_CAP: prod;
+
+% Energia entregada/vendida (MW) al cliente s in 1..m en el dia j in 1..n
+array[1..m, 1..n] of var 0..MAX_DEM: vendido;
+
+% Variable objetivo: ganancia neta acumulada en el horizonte de n dias
+var MIN_GAN..MAX_GAN: ganancia;
+
+% ---------------------- 5. Restricciones Primarias ---------------------------
+
+% C1: Limite de capacidad maxima diaria de cada planta (consistencia de nodo)
+constraint forall(i in 1..np, j in 1..n)(
   prod[i, j] <= plantas[i, 3]
 );
 
-%No vender a un cliente más de su demanda
-constraint forall(i in 1..m, j in 1..n) (
-  vendido[i, j] <= demandas[i, j]
+% C2: Rango de satisfaccion de demanda por cliente y dia (minimo G% y maximo d_{s,j})
+constraint forall(s in 1..m, j in 1..n)(
+  vendido[s, j] >= min_dem[s, j] /\
+  vendido[s, j] <= demandas[s, j]
 );
 
-%Cumplir con las demandas total o el límite mínimo
-constraint forall(i in 1.. m, j in 1..n)(
-  (total[i, j] = (vendido[i,j] == demandas[i, j])) /\
-  (parcial[i, j] = (vendido[i,j] >= ((min_prod*demandas[i, j]) div 100))) /\
-  (total[i, j] \/ parcial[i, j])  
+% C3: Cobertura energetica diaria (lo vendido no supera lo producido en el dia)
+constraint forall(j in 1..n)(
+  sum(s in 1..m)(vendido[s, j]) <= sum(i in 1..np)(prod[i, j])
 );
 
-%Restricción de regimen alto de hidroeléctricas
-constraint forall(i in 1..np, k in 1..(n - max_days_high[i])
-  where TYPES[plantas[i, 1]] == "Hidro" /\ max_days_high[i] > 0
- )
- (exists(d in 0..max_days_high[i]) (
-    prod[i, k + d] <= ((percent_high * plantas[i, 3]) div 100)
-  ));
-  
+% C4: Prohibicion de operar max_days_high[i] dias consecutivos en regimen alto
+%     (> umbral_alto[i]) aplicada a todas las centrales del parque generador
+constraint forall(i in 1..np where max_days_high[i] >= 1 /\ max_days_high[i] <= n)(
+  forall(k in 1..(n - max_days_high[i] + 1))(
+    exists(d in 0..(max_days_high[i] - 1))(
+      prod[i, k + d] <= umbral_alto[i]
+    )
+  )
+);
 
-% -------------- Función objetivo -----------------
+% -------------------- 6. Restricciones Redundantes ---------------------------
 
-constraint ganancia = sum(i in 1..m, j in 1..n)(vendido[i,j]*pagos[i]) - sum(i in 1..np, j in 1..n)(prod[i,j]*plantas[i,2]);
+% R1: Cota inferior de produccion diaria agregada
+constraint forall(j in 1..n)(
+  sum(i in 1..np)(prod[i, j]) >= sum(s in 1..m)(min_dem[s, j])
+);
+
+% R2: Equilibrio exacto de flujo diario sin sobreproduccion esteril en el optimo
+%     y cota superior de demanda agregada diaria
+constraint forall(j in 1..n)(
+  sum(i in 1..np)(prod[i, j]) == sum(s in 1..m)(vendido[s, j]) /\
+  sum(i in 1..np)(prod[i, j]) <= sum(s in 1..m)(demandas[s, j])
+);
+
+% R3: Cota lineal acumulada en toda ventana deslizante de regimen alto
+constraint forall(i in 1..np where max_days_high[i] >= 1 /\ max_days_high[i] <= n)(
+  forall(k in 1..(n - max_days_high[i] + 1))(
+    sum(d in 0..(max_days_high[i] - 1))(prod[i, k + d]) <=
+      (max_days_high[i] - 1) * plantas[i, 3] + umbral_alto[i]
+  )
+);
+
+% R4: Dominancia por orden de merito y saturacion del umbral de regimen normal
+constraint forall(j in 1..n, p1, p2 in 1..np where
+  (plantas[p1, 2] < plantas[p2, 2]) \/ (plantas[p1, 2] == plantas[p2, 2] /\ p1 < p2)
+)(
+  ((prod[p2, j] > 0) -> (prod[p1, j] >= umbral_alto[p1])) /\
+  ((prod[p1, j] > umbral_alto[p1] /\ prod[p2, j] > umbral_alto[p2]) -> (prod[p1, j] == plantas[p1, 3]))
+);
+
+constraint forall(j in 1..n, p1, p2 in 1..np where
+  p1 != p2 /\ plantas[p2, 2] <= plantas[p1, 2]
+)(
+  (prod[p1, j] > umbral_alto[p1]) -> (prod[p2, j] >= umbral_alto[p2])
+);
+
+constraint forall(j in 1..n, s in 1..m, p in 1..np where pagos[s] > plantas[p, 2])(
+  (vendido[s, j] < demandas[s, j]) -> (prod[p, j] >= umbral_alto[p])
+);
+
+constraint forall(j in 1..n, s1, s2 in 1..m where
+  (pagos[s1] > pagos[s2]) \/ (pagos[s1] == pagos[s2] /\ s1 < s2)
+)(
+  (vendido[s2, j] > min_dem[s2, j]) -> (vendido[s1, j] == demandas[s1, j])
+);
+
+% R5: Proyeccion lineal de Fourier-Motzkin sobre la ganancia neta por nivel de costo c_q
+constraint forall(q in 1..np)(
+  ganancia <= sum(s in 1..m, j in 1..n)((pagos[s] - plantas[q, 2]) * vendido[s, j])
+            - sum(i in 1..np, j in 1..n)((plantas[i, 2] - plantas[q, 2]) * prod[i, j])
+);
+
+% -------------------- 7. Rompimiento de Simetrias ----------------------------
+
+% S1: Ordenamiento lexicografico descendente entre plantas gemelas
+constraint forall(p1, p2 in 1..np where p1 < p2 /\
+  plantas[p1, 2] == plantas[p2, 2] /\
+  plantas[p1, 3] == plantas[p2, 3] /\
+  max_days_high[p1] == max_days_high[p2]
+)(
+  lex_greatereq([prod[p1, j] | j in 1..n], [prod[p2, j] | j in 1..n])
+);
+
+% S2: Ordenamiento lexicografico descendente entre clientes gemelos
+constraint forall(s1, s2 in 1..m where s1 < s2 /\
+  pagos[s1] == pagos[s2] /\
+  forall(j in 1..n)(demandas[s1, j] == demandas[s2, j])
+)(
+  lex_greatereq([vendido[s1, j] | j in 1..n], [vendido[s2, j] | j in 1..n])
+);
+
+% ---------------- 8. Funcion Objetivo y Estrategia de Busqueda ---------------
+
+constraint ganancia = sum(s in 1..m, j in 1..n)(vendido[s, j] * pagos[s])
+                    - sum(i in 1..np, j in 1..n)(prod[i, j] * plantas[i, 2]);
 
 solve :: int_search(
-        array1d(prod) ++ array1d(vendido),       
-        first_fail, 
-        indomain_min)
+        array1d(prod) ++ array1d(vendido),
+        input_order,
+        indomain_reverse_split)
         maximize ganancia;
-        
+
+% -------------------------- 9. Formato de Salida -----------------------------
+
 output [
   "=== RESUMEN FINANCIERO ===\n",
   "Ganancia neta: ", show(ganancia), "\n",
-  "Ingresos:      ", show(sum(k in 1..m, j in 1..n)(vendido[k, j] * pagos[k])), "\n",
-  "Costos:        ", show(sum(i in 1..np, j in 1..n)(prod[i, j] * plantas[i, 1])), "\n\n",
+  "Ingresos:      ", show(sum(s in 1..m, j in 1..n)(vendido[s, j] * pagos[s])), "\n",
+  "Costos:        ", show(sum(i in 1..np, j in 1..n)(prod[i, j] * plantas[i, 2])), "\n\n",
 
-  "=== PRODUCCIÓN POR PLANTA (MW) ===\n",
-  "Planta \\ Día | "
+  "=== PRODUCCION POR PLANTA (MW) ===\n",
+  "Planta \\ Dia | "
 ] ++
-[ show_int(5, j) | j in 1..n ] ++ [" | Total\n"] ++
+[ show_int(5, j) | j in 1..n ] ++ [" |  Total | Umbral Alto\n"] ++
 [
   if j == 1 then
-    "Planta " ++ show_int(2, i) ++ " (" ++ show(TYPES[i]) ++ ") | "
+    "Planta " ++ show_int(2, i) ++ " (" ++ TYPES[plantas[i, 1]] ++ ") | "
   else "" endif ++
   show_int(5, prod[i, j]) ++
   if j == n then
-    " | " ++ show_int(6, sum(d in 1..n)(prod[i, d])) ++ "\n"
+    " | " ++ show_int(6, sum(d in 1..n)(prod[i, d])) ++
+    " | " ++ show_int(4, umbral_alto[i]) ++ " MW (max " ++ show(max_days_high[i]) ++ "d)\n"
   else "" endif
   | i in 1..np, j in 1..n
 ] ++
 [
-  "\n=== ENERGÍA VENDIDA POR CLIENTE (MW) ===\n",
-  "Cliente \\ Día | "
+  "\n=== ENERGIA VENDIDA POR CLIENTE (MW) ===\n",
+  "Cliente \\ Dia | "
 ] ++
 [ show_int(5, j) | j in 1..n ] ++ [" | Vendido / Demanda\n"] ++
 [
   if j == 1 then
-    "Cliente " ++ show_int(2, k) ++ "    | "
+    "Cliente " ++ show_int(2, s) ++ "    | "
   else "" endif ++
-  show_int(5, vendido[k, j]) ++
+  show_int(5, vendido[s, j]) ++
   if j == n then
-    " | " ++ show_int(6, sum(d in 1..n)(vendido[k, d])) ++
-    " / " ++ show_int(6, sum(d in 1..n)(demandas[k, d])) ++ "\n"
+    " | " ++ show_int(6, sum(d in 1..n)(vendido[s, d])) ++
+    " / " ++ show_int(6, sum(d in 1..n)(demandas[s, d])) ++ "\n"
   else "" endif
-  | k in 1..m, j in 1..n
+  | s in 1..m, j in 1..n
 ];

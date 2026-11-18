@@ -1,24 +1,31 @@
-TYPES = ["Nuclear", "Hidro", "Termico"]; %Tipos de Plantas
-np = 3; %Cantidad de plantas eléctricas
-% Descripción de las plantas eléctricas
-% Tipo de planta | costo por MW | Máximo de producción diaria
-plantas = [|1, 10, 1000
-          | 2, 20, 300
-          | 3, 30, 500|];
- 
-%Información de planeación
-n = 3; %Número de días a planear
-m = 3; %Número de clientess
-demandas = [| 25, 50, 100
-            | 50, 80, 50
-            | 30, 60, 90|]; %Demanda de energía por cada cliente por día
-pagos = [50, 40, 60]; %Precio de MW para cada cliente
+% =============================================================================
+% Formato base de entrada de datos: Datos.dzn
+% Configuración de todos los parámetros del modelo PlantaEnergia.mzn
+% =============================================================================
 
-min_prod = 50; %Porcentaje mínimo de cumplimiento de demandas (50%)
+TYPES = ["Nuclear", "Hidro", "Termica"]; % Catálogo de tipos de plantas
+np = 3;                                  % Número de plantas eléctricas
 
-% Límites de centrales hidroélectricas
-percent_high = 80; %Porcentaje que establece el regimen alto de las hidroelectricas
-max_days_high = [-1, 2, -1]; %Máximo de dias consecutivos que puede operar una hidroelectrica en alto régimen
+% Matriz de plantas: [Tipo | Costo ($/MW) | Capacidad máxima diaria (MW)]
+plantas = [| 1, 10, 1000
+           | 2, 20,  300
+           | 3, 30,  500 |];
 
+% Horizonte de planificación y clientes
+n = 3; % Número de días a planificar
+m = 3; % Número de clientes
 
-            
+% Matriz de demanda diaria estimada d_{s,j} (MW) por cliente (filas) y día (columnas)
+demandas = [|  25, 50, 100
+            |  50, 80,  50
+            |  30, 60,  90 |];
+
+% Pago unitario P_s ($/MW) por cada cliente
+pagos = [50, 40, 60];
+
+% Porcentaje mínimo obligatorio de satisfacción de demanda por cliente y día (G = 50%)
+min_prod = 50;
+
+% Parámetros de régimen alto para todas las centrales del parque
+percent_high = 80;             % Porcentaje de capacidad que define régimen alto (H = 80%)
+max_days_high = [3, 2, 3];     % Días consecutivos prohibidos en régimen alto por central
