@@ -1,0 +1,22 @@
+# Archivos auxiliares de compilación de LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.synctex(busy)
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+*.lof
+*.lot
+*.bcf
+*.run.xml
+
+# Archivos temporales del sistema y cache de pruebas
+Thumbs.db
+Desktop.ini
+.DS_Store
+__pycache__/
+*.py[cod]
