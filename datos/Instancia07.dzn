@@ -1,0 +1,29 @@
+% =============================================================================
+% Instancia 07: Planificacion semanal (n = 7) con 5 plantas y minimo G = 70%
+% np = 5 plantas (Eolica, Nuclear, 2 Hidro gemelas, Termica), m = 5 clientes
+% =============================================================================
+
+TYPES = ["Nuclear", "Hidro", "Termica", "Eolica"];
+np = 5;
+
+% [Tipo | Costo ($/MW) | Capacidad maxima diaria (MW)]
+plantas = [| 4,  6, 200
+           | 1, 12, 700
+           | 2, 20, 250
+           | 2, 20, 250
+           | 3, 36, 400 |];
+
+n = 7;
+m = 5;
+
+demandas = [| 300, 320, 350, 340, 300, 280, 310
+            | 260, 280, 300, 290, 260, 240, 270
+            | 220, 240, 260, 250, 220, 200, 230
+            | 180, 200, 220, 210, 180, 160, 190
+            | 140, 160, 170, 160, 140, 120, 150 |];
+
+pagos = [68, 58, 52, 46, 30];
+
+min_prod = 70;
+percent_high = 80;
+max_days_high = [2, 3, 2, 2, 3];

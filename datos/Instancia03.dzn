@@ -1,0 +1,27 @@
+% =============================================================================
+% Instancia 03: Recorte economico al minimo legal G=60% para cliente de pago bajo
+% np = 3 plantas (Nuclear, Hidro, Termica), m = 4 clientes, n = 5 dias
+% Cliente 4 paga 22 $/MW (< costo Termica 35 $/MW)
+% =============================================================================
+
+TYPES = ["Nuclear", "Hidro", "Termica"];
+np = 3;
+
+% [Tipo | Costo ($/MW) | Capacidad maxima diaria (MW)]
+plantas = [| 1, 10, 400
+           | 2, 20, 200
+           | 3, 35, 400 |];
+
+n = 5;
+m = 4;
+
+demandas = [| 150, 200, 200, 150, 200
+            | 150, 150, 200, 150, 150
+            | 100, 150, 150, 100, 150
+            | 100, 150, 150, 100, 150 |];
+
+pagos = [60, 50, 45, 22];
+
+min_prod = 60;
+percent_high = 75;
+max_days_high = [2, 2, 2];

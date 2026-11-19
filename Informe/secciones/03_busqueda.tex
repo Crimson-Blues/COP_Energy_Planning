@@ -1,0 +1,60 @@
+% !TEX root = ../main.tex
+\section{La Búsqueda: Estrategias en Branch-and-Bound}
+\label{sec:busqueda}
+
+Conforme al principio algorítmico fundamental del Capítulo 8 de Apt (\emph{Search Algorithm = Search Tree + Traversal Algorithm}), la resolución de un $\text{COP}(\mathcal{FD})$ en MiniZinc extiende los árboles de etiquetado con propagación (\emph{prop labeling trees}) mediante el esquema \emph{Branch-and-Bound} (Ramificación y Acotamiento). En este esquema, cada vez que el buscador alcanza una hoja factible con asignación completa $(\widehat{prod}, \widehat{vendido})$ y valor objetivo $Z_k$, registra dicha solución como nueva incumbente y añade dinámicamente al almacén de restricciones la desigualdad estricta de superación:
+\begin{equation}
+    ganancia \ge Z_k + 1
+    \label{eq:bnb_cut}
+\end{equation}
+Al retroceder (\emph{backtracking}), la regla de reducción de intervalos aplicada sobre \eqref{eq:bnb_cut} y sobre las proyecciones de Fourier-Motzkin $R_5$ \eqref{eq:r5_fm_dia}--\eqref{eq:r5_fm_global} poda de forma inmediata cualquier subárbol cuya cota superior optimista $\overline{ganancia}$ sea estrictamente menor que $Z_k + 1$.
+
+\subsection{Diseño de las Estrategias de Búsqueda Exploradas}
+
+En virtud de que la velocidad de convergencia de \emph{Branch-and-Bound} depende críticamente tanto de la rapidez con que se descubre una solución incumbente cercana al óptimo global $Z^*$ como de la profundidad necesaria para refutar subárboles infactibles, se diseñaron y evaluaron ocho estrategias de búsqueda ($E_1$--$E_8$) sobre el vector de decisión concatenado $\vec{x} = \texttt{array1d(prod) ++ array1d(vendido)}$:
+
+\begin{enumerate}
+    \item \textbf{$E_1$ (\texttt{input\_order} + \texttt{indomain\_reverse\_split}) — Estrategia oficial adoptada en \texttt{PlantaEnergia.mzn}:}
+    Selecciona las variables siguiendo el orden estructural del arreglo $\vec{x}$ (primero las variables de generación $prod_{i,j}$ ordenadas por planta $i=1\dots np$ a lo largo de los días $j=1\dots n$, y posteriormente las variables de venta $vendido_{s,j}$) y divide recursivamente el dominio actual $[l, u]$ de la variable seleccionada mediante bisección descendente:
+    \begin{equation}
+        \text{Rama izquierda: } x > \left\lfloor \frac{l + u}{2} \right\rfloor \qquad \text{frente a} \qquad \text{Rama derecha: } x \le \left\lfloor \frac{l + u}{2} \right\rfloor
+        \label{eq:reverse_split}
+    \end{equation}
+
+    \item \textbf{$E_2$ (\texttt{input\_order} + \texttt{indomain\_max}):}
+    Mantiene el orden causal de variables $prod \to vendido$, pero instancia cada variable probando puntualmente su valor máximo disponible ($x = u$ en la rama izquierda frente a $x \neq u$, es decir $x \le u - 1$, en la rama derecha).
+
+    \item \textbf{$E_3$ (\texttt{input\_order} + \texttt{indomain\_min}):}
+    Recorre las variables en orden de entrada asignando primero el valor mínimo del dominio ($x = l$ frente a $x \ge l + 1$).
+
+    \item \textbf{$E_4$ (\texttt{first\_fail} con \texttt{indomain\_reverse\_split}):}
+    Combina la selección dinámica de la variable con dominio más pequeño (\emph{fail-first principle}, Capítulo 8 de Apt) con la bisección descendente de intervalos \eqref{eq:reverse_split}.
+
+    \item \textbf{$E_5$ (\texttt{first\_fail} + \texttt{indomain\_max}):}
+    Selecciona la variable no fijada de menor cardinalidad de dominio $|D(x)|$ y le asigna su cota superior actual $u$.
+
+    \item \textbf{$E_6$ (\texttt{first\_fail} + \texttt{indomain\_min}) — Estrategia del borrador inicial:}
+    Selecciona la variable de menor dominio actual y prueba en primer lugar su valor mínimo $l$.
+
+    \item \textbf{$E_7$ (heurística \texttt{dom\_w\_deg} con \texttt{indomain\_max}):}
+    Selecciona la variable que minimiza la razón $|D(x)| / \text{wdeg}(x)$, donde $\text{wdeg}(x)$ acumula el peso de los propagadores en los que ha participado $x$ y que han derivado en fallo previo, asignando el valor máximo $u$.
+
+    \item \textbf{$E_8$ (\texttt{default} del solver):}
+    Delega la selección de variables y valores en la heurística interna nativa de cada motor (\emph{activity-based search} en Gecode; búsqueda híbrida VSIDS/LCG sobre literales de orden en Chuffed).
+\end{enumerate}
+
+\subsection{Fundamentación Teórica del Comportamiento de las Heurísticas}
+\label{subsec:teoria_busqueda}
+
+El análisis teórico de la estructura del COP permite explicar tres fenómenos algorítmicos fundamentales que se verifican experimentalmente en la Sección~\ref{sec:pruebas}:
+
+\begin{itemize}
+    \item \textbf{Superioridad de la bisección descendente frente a la enumeración unitaria:}
+    En dominios numéricos grandes del orden de $Cap_i \in [300, 1000]\text{ MW}$, cuando una planta no puede operar a capacidad máxima $Cap_i$ sino en su umbral de régimen normal $U_i$ (por ejemplo, $Cap_i = 400$ y $U_i = 320$), la ramificación puntual \texttt{indomain\_max} ($x = 400$ frente a $x \le 399$) solo reduce la cota superior en $1\text{ MW}$ por cada fallo en la rama derecha, requiriendo una cadena lineal de $Cap_i - U_i = 80$ niveles de profundidad por variable antes de alcanzar el régimen normal $U_i$. En contraste, la bisección descendente divide el intervalo a la mitad en cada nivel, modificando sustancialmente las cotas $[l, u]$ en ambas ramas, lo que activa inmediatamente las reglas de reducción de intervalos lineales del Capítulo 6 de Apt en complejidad logarítmica $\mathcal{O}(\log_2 Cap_i)$ ($\le 10$ pasos para $Cap_i = 1000$).
+
+    \item \textbf{Desacoplamiento de escalas físicas entre generación y venta:}
+    En el vector concatenado $\vec{x} = prod \mathbin{+\!+} vendido$, las variables de venta $vendido_{s,j}$ tienen dominios de ancho $d_{s,j} - d^{\min}_{s,j} \in [12, 150]\text{ MW}$, estrictamente más pequeños que los dominios de las centrales principales $prod_{i,j} \in [0, 1000]\text{ MW}$. Como consecuencia, \texttt{first\_fail} invierte el orden causal del problema: selecciona primero todas las variables de venta $vendido_{s,j}$ (o las plantas pequeñas de respaldo) antes de fijar la generación de las centrales base, postergando la activación de las restricciones inter-temporales de régimen alto $C_4$ hasta los niveles más profundos del árbol. Por el contrario, el orden de entrada (\texttt{input\_order}) instancia secuencialmente $prod_{1, 1..n}, prod_{2, 1..n}, \dots$ siguiendo el orden de mérito de las plantas: al fijar la trayectoria temporal de la central más económica, las ventanas deslizantes $C_4$ y $R_3$ podan en los primeros niveles del árbol cualquier secuencia de días consecutivos en régimen alto, y una vez determinado el despacho $prod$, las restricciones de balance $R_2$ y dominancia tarifaria $R_4$ fijan $vendido_{s,j}$ por propagación directa sin ramificación adicional.
+
+    \item \textbf{Colapso exponencial de \texttt{indomain\_min} en problemas de maximización:}
+    Al minimizar primero los valores de venta ($vendido_{s,j} = d^{\min}_{s,j}$), las estrategias con \texttt{indomain\_min} ($E_3$ y $E_6$) construyen hojas iniciales con la peor ganancia posible ($\underline{Z}$), generando una cota de \emph{Branch-and-Bound} \eqref{eq:bnb_cut} inútilmente débil que obliga al motor a recorrer de manera ascendente miles de soluciones subóptimas intermedias antes de aproximarse al óptimo $Z^*$.
+\end{itemize}
