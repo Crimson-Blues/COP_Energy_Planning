@@ -1,12 +1,21 @@
 % !TEX root = ../main.tex
 \section{El Modelo: Planificación de Plantas de Energía (COP)}
 \label{sec:modelo}
+\subsection{Descripción del Problema}
 
-El problema de planificación operativa de un parque de centrales eléctricas en un horizonte finito constituye un Problema de Optimización con Restricciones sobre dominios enteros finitos ($\text{COP}(\mathcal{FD})$), definido formalmente por la cuádrupla $\mathcal{P}_{\text{COP}} = \langle \mathcal{X}, \mathcal{D}, \mathcal{C}, f_{\text{obj}} \rangle$ en el marco teórico de Apt. A diferencia de un problema de satisfacción pura (CSP), donde toda asignación consistente en $\mathcal{C}$ es igualmente aceptable, en $\mathcal{P}_{\text{COP}}$ se busca determinar una asignación factible que maximice la ganancia económica neta acumulada por el proveedor energético a lo largo de $n$ días, acoplando decisiones de generación por planta con decisiones de suministro comercial por cliente bajo restricciones técnicas de capacidad, garantía mínima de servicio y limitación de desgaste de turbinas por operación continua en régimen alto.
+Un proveedor de energía es dueño de un parque con múltiples centrales eléctricas de diversidad de tipos (Hidroeléctrica, térmica, nuclear ...), cada una con costos de producción y límite diario de producción específicos. Adicionalmente, tiene una cantidad dada de clientes a los que vende energía a precios distintos a fin de cumplir con un cronograma de demandas energéticas para un plazo de $n$ días.\\
+
+El objetivo del problema es planificar la producción energética de cada central eléctrica a fin de maximizar la ganancia obtenida de la producción y venta de energía, solucionando el problema de forma generalizada, previendo la modificación de costos, precios y demandas a futuro.\\
+
+El problema de planificación operativa de un parque de centrales eléctricas constituye un Problema de Optimización con Restricciones sobre dominios enteros finitos ($\text{COP}(\mathcal{FD})$), definido formalmente por la cuádrupla $\mathcal{P}_{\text{COP}} = \langle \mathcal{X}, \mathcal{D}, \mathcal{C}, f_{\text{obj}} \rangle$. Para $\mathcal{X}$ un conjunto de variables, que toman valores de $\mathcal{D}$ un conjunto de dominios correspondiente, además de una serie de restricciones $\mathcal{C}$ definidas sobre las variables $x_1,\cdots,x_k$ con dominios $D_1,\cdots,D_k$, y finalmente una función objetivo $f_{obj}:D_1\times D_2\times \cdots \times D_k \to \mathbb{R}$.\\
+
+De forma que un COP, constituye un problema de satisfacción de restricciones ($\mathcal{P}_{\text{CSP}} = \langle \mathcal{X}, \mathcal{D}, \mathcal{C} \rangle$) junto con la adición de una función objetivo $f_{obj}$.\\
+
+A diferencia de un problema de satisfacción pura, donde toda asignación consistente en $\mathcal{C}$ es igualmente aceptable como una solución, en un COP se busca determinar una solución factible (que cumpla con la totalidad de restricciones) que además maximice el valor de la función objetivo. Para el problema particular de planificación de producción energética esto corresponde a la maximización de la ganancia económica neta acumulada por el proveedor energético a lo largo de $n$ días, balanceando la toma de decisiones de generación por planta y el suministro de energía por cliente bajo restricciones técnicas de capacidad, garantía mínima de servicio y limitación de desgaste de turbinas por operación continua en régimen alto.
 
 \subsection{Conjuntos, Índices y Parámetros del Modelo}
 
-Para garantizar la total generalidad del modelo frente a la creación o eliminación futura de centrales eléctricas, variaciones en el horizonte temporal, incorporación de nuevos clientes o cambios regulatorios en las políticas de despacho, la formulación se parametriza íntegramente sin fijar constantes en la estructura algebraica:
+Para garantizar la total generalidad del modelo frente a la creación o eliminación futura de centrales eléctricas, incorporación de nuevos clientes o cambios en las políticas de producción o cumplimiento de demandas, la formulación del modelo se parametriza íntegramente sin fijar constantes en la estructura algebraica:
 
 \begin{itemize}
     \item \textbf{Conjuntos de índices:}
@@ -14,42 +23,63 @@ Para garantizar la total generalidad del modelo frente a la creación o eliminac
         \item $P = \{1, 2, \dots, np\}$: conjunto de centrales eléctricas activas en el parque generador, donde $np \in \mathbb{Z}^+$ denota el número total de plantas ($i \in P$).
         \item $D = \{1, 2, \dots, n\}$: conjunto ordenado de días del horizonte de planificación, con $n \in \mathbb{Z}^+$ ($j \in D$).
         \item $S = \{1, 2, \dots, m\}$: conjunto de clientes o comercializadores contratados, con $m \in \mathbb{Z}^+$ ($s \in S$).
-        \item $\mathcal{T} = \{1, 2, \dots, |\text{TYPES}|\}$: catálogo de tecnologías de generación (por ejemplo, Nuclear, Hidroeléctrica, Térmica, Solar, Eólica, Biomasa).
+        \item $\mathcal{T} = \{1, 2, \dots, |\text{TYPES}|\}$: catálogo de tipos de tecnologías de generación (por ejemplo, Nuclear, Hidroeléctrica, Térmica, Solar, Eólica, Biomasa).
     \end{itemize}
 
-    \item \textbf{Parámetros técnicos y económicos de entrada (configurados en \texttt{Datos.dzn}):}
+    \item \textbf{Parámetros técnicos y económicos de entrada:}\\
+    
+    Por cada planta $i \in P$ del parque eléctrico se define:
     \begin{itemize}
         \item $t_i \in \mathcal{T}$ (\texttt{plantas[i, 1]}): identificador tecnológico de la central $i \in P$.
         \item $c_i \in \mathbb{Z}_{\ge 0}$ (\texttt{plantas[i, 2]}): costo unitario de producción de un megavatio ($1\text{ MW}$) en la central $i \in P$ (expresado en unidades monetarias $\$/\text{MW}$).
         \item $Cap_i \in \mathbb{Z}^+$ (\texttt{plantas[i, 3]}): capacidad máxima de producción diaria de la central $i \in P$ (en $\text{MW}$).
-        \item $d_{s,j} \in \mathbb{Z}_{\ge 0}$ (\texttt{demandas[s, j]}): demanda diaria de energía estimada (en $\text{MW}$) por el cliente $s \in S$ durante el día $j \in D$.
+    \end{itemize}
+    Por otro lado, por cada cliente $s \in S$, se debe especificar:
+    \begin{itemize}
         \item $P_s \in \mathbb{Z}_{\ge 0}$ (\texttt{pagos[s]}): tarifa o pago individual (en $\$/\text{MW}$) que realiza el cliente $s \in S$ por cada megavatio de energía efectivamente entregado.
-        \item $G \in [0, 100] \cap \mathbb{Z}$ (\texttt{min\_prod}): porcentaje mínimo obligatorio de satisfacción de la demanda diaria requerida por cada cliente $s \in S$ en cualquier día $j \in D$.
-        \item $H \in (0, 100] \cap \mathbb{Z}$ (\texttt{percent\_high}): porcentaje de la capacidad máxima diaria $Cap_i$ a partir del cual (estrictamente por encima) se considera que una central opera en \emph{régimen alto}.
-        \item $R_i \in \mathbb{Z}^+ \cup \{-1\}$ (\texttt{max\_days\_high[i]}): número de días consecutivos en régimen alto que está prohibido alcanzar para la central $i \in P$ con el fin de limitar el desgaste mecánico y térmico de sus turbinas (para todas las centrales sujetas a control de desgaste se tiene $R_i \ge 2$; el valor centinela $-1$ permite representar opcionalmente una central exenta).
+    \end{itemize}
+    Y por cada cliente $s \in S$, y día de planificación $j \in D$:
+    \begin{itemize}
+        \item $d_{s,j} \in \mathbb{Z}_{\ge 0}$ (\texttt{demandas[s, j]}): demanda diaria de energía estimada (en $\text{MW}$) por el cliente $s \in S$ durante el día $j \in D$.
+    \end{itemize}
+    De forma general, para la totalidad del parque de centrales se establece:
+    \begin{itemize}
+        \item $G \in [0, 100] \cap \mathbb{Z}$ (\texttt{min\_prod}): porcentaje mínimo obligatorio de satisfacción de la demanda diaria requerida por cada cliente $s \in S$ en cualquier día $j \in D$. 
+    \end{itemize}
+    Finalmente, dada la naturaleza de desgaste mecánico a la que están sometidas las centrales hidroeléctricas, se deben definir los parámetros que definen el estado de \textit{régimen alto} en dónde el desgaste mecánico es alto:
+    \begin{itemize}
+        \item $H \in (0, 100] \cap \mathbb{Z}$ (\texttt{percent\_high}): porcentaje de la capacidad máxima diaria $Cap_i$ a partir del cual (estrictamente por encima) se considera que una central hidroeléctrica opera en \emph{régimen alto}.
+        \item $R_i \in \mathbb{Z}^+ \cup \{-1\}$ (\texttt{max\_days\_high[i]}): número de días consecutivos en régimen alto que está prohibido alcanzar para la central $i \in P$ con el fin de limitar el desgaste mecánico y térmico de sus turbinas (para todas las centrales sujetas a control de desgaste se tiene $R_i \ge 2$; el valor centinela $-1$ permite representar opcionalmente una central exenta de la restricción).
     \end{itemize}
 
+    Adicionalmente, a partir de los parámetros principales se calculan valores de referencia para facilitar la definición de restricciones y permitir la acotación de los dominios de las variables de decisión:
+    
     \item \textbf{Parámetros derivados calculados en tiempo de compilación:}
     \begin{align}
         d^{\min}_{s,j} &= \left\lfloor \frac{G \cdot d_{s,j}}{100} \right\rfloor, \quad \forall s \in S, \; \forall j \in D \label{eq:cop_dmin} \\
         U_i &= \left\lfloor \frac{H \cdot Cap_i}{100} \right\rfloor, \quad \forall i \in P \label{eq:cop_umbral} \\
         c_{\min} &= \min_{i \in P} c_i, \qquad Cap_{\max} = \max_{i \in P} Cap_i, \qquad d_{\max} = \max_{s \in S, j \in D} d_{s,j} \label{eq:cop_extremos}
     \end{align}
-    donde $d^{\min}_{s,j}$ representa el piso físico obligatorio de energía que debe suministrarse al cliente $s$ en el día $j$, y $U_i$ representa el techo máximo de producción diaria de la central $i$ dentro de su \emph{régimen normal} (de modo que la central $i$ entra en régimen alto en el día $j$ si y solo si su producción supera estrictamente $U_i$, es decir, $prod_{i,j} \ge U_i + 1$). En el caso particular de una central hidroeléctrica con $Cap_i = 300\text{ MW}$ y $H = 80\%$, la ecuación \eqref{eq:cop_umbral} produce exactamente $U_i = 240\text{ MW}$, coincidiendo con la especificación del enunciado.
+    donde $d^{\min}_{s,j}$ representa el piso físico obligatorio de energía que debe suministrarse al cliente $s$ en el día $j$, y $U_i$ representa el techo máximo de producción diaria de la central $i$ dentro de su \emph{régimen normal} (de modo que la central $i$ entra en régimen alto en el día $j$ si y solo si su producción supera estrictamente $U_i$, es decir, $prod_{i,j} \ge U_i + 1$). Por ejemplo, en el caso particular de una central hidroeléctrica con $Cap_i = 300\text{ MW}$ y $H = 80\%$, la ecuación \eqref{eq:cop_umbral} produce exactamente $U_i = 240\text{ MW}$, coincidiendo con la especificación del enunciado. También se calculan cotas máximas para la capacidad máxima de producción diaria y demandas energéticas para delimitar el dominio de las variables de decisión.\\
+
+    Por último, observe que al interior de la implementación del modelo en Minizinc, la información de tipología, costo de producción y capacidad máxima por planta eléctrica se organiza en un único 
 \end{itemize}
 
 \subsection{Variables de Decisión y Dominios Finitos Acotados}
 
-Siguiendo el principio de separación estricta entre parámetros conocidos e incógnitas del modelo, así como el criterio de consistencia de nodo inicial (Capítulo 5 de Apt), el conjunto de variables de decisión $\mathcal{X}$ se compone exclusivamente de las matrices de despacho físico, entrega comercial y beneficio neto, acotando sus dominios iniciales para excluir desde el inicio valores físicamente imposibles:
+El conjunto de variables de decisión $\mathcal{X}$ se compone exclusivamente de las matrices que definen la producción física de energía, entrega comercial a cada cliente por día y  el beneficio neto producto de las ventas respectivas. Estas se definen acotando sus dominios iniciales para excluir desde el inicio valores físicamente imposibles:
 
 \begin{enumerate}
-    \item \textbf{Producción diaria por central ($prod_{i,j}$):} Para cada planta $i \in P$ y día $j \in D$, la variable entera $prod_{i,j}$ representa la cantidad de energía (en $\text{MW}$) generada por la central $i$ en el día $j$. Su dominio finito exacto inducido por consistencia de nodo es:
+    \item \textbf{Producción diaria por central ($prod_{i,j}$):} Para cada planta $i \in P$ y día $j \in D$, la variable entera $prod_{i,j}$ representa la cantidad de energía (en $\text{MW}$) generada por la central $i$ en el día $j$. Su dominio finito exacto corresponde a:
     \begin{equation}
         D(prod_{i,j}) = \{0, 1, \dots, Cap_i\} \subseteq \{0, 1, \dots, Cap_{\max}\}, \quad \forall i \in P, \; \forall j \in D
         \label{eq:dom_prod}
     \end{equation}
-
-    \item \textbf{Energía entregada por cliente y día ($vendido_{s,j}$):} Para cada cliente $s \in S$ y día $j \in D$, la variable entera $vendido_{s,j}$ representa la energía (en $\text{MW}$) suministrada y facturada al cliente $s$ en el día $j$. Dado que nunca se puede entregar menos del porcentaje mínimo garantizado $G\%$ ni vender a un cliente más de su demanda requerida $d_{s,j}$, su dominio finito exacto es:
+    Dónde $Cap_{\max}$ corresponde a la máxima producción diaria $Cap_i$ de entre todas las plantas. $Cap_{\max}=Max_P(Cap_i)$, dado que en ningún caso ninguna planta podrá sobrepasar este límite de producción diaria.\\
+    
+    \item \textbf{Energía entregada por cliente y día ($vendido_{s,j}$):} Para cada cliente $s \in S$ y día $j \in D$, la variable entera $vendido_{s,j}$ representa la energía (en $\text{MW}$) suministrada y facturada al cliente $s$ en el día $j$. En este caso, se asume que ningún cliente impone restricciones sobre el origen de la energía que compra, por lo que toda la energía producida, sin importar la planta de origen o el tipo de energía de producción se distribuyen indiscriminadamente como parte de un \textit{pool} común. De esta forma, la producción y venta de energía se separan en dos variables de decisión distintas.\\
+    
+    Dado que nunca se puede entregar menos del porcentaje mínimo garantizado $G\%$ ni vender a un cliente más de su demanda requerida $d_{s,j}$, su dominio finito exacto es:
     \begin{equation}
         D(vendido_{s,j}) = \{d^{\min}_{s,j}, d^{\min}_{s,j} + 1, \dots, d_{s,j}\} \subseteq \{0, 1, \dots, d_{\max}\}, \quad \forall s \in S, \; \forall j \in D
         \label{eq:dom_vendido}
@@ -63,27 +93,27 @@ Siguiendo el principio de separación estricta entre parámetros conocidos e inc
     \end{align}
 \end{enumerate}
 
-En total, una instancia con $np$ plantas, $m$ clientes y $n$ días posee $(np + m)\cdot n$ variables principales de decisión de despacho y venta, más las variables lineales funcionalmente dependientes de ganancia.
+En total, una instancia de modelo con $np$ plantas, $m$ clientes y $n$ días posee $(np + m)\cdot n$ variables principales de decisión de producción y venta, más las variables lineales funcionalmente dependientes de ganancia.
 
 \subsection{Definición Formal de las Restricciones Primarias}
 
 El conjunto de restricciones primarias $\mathcal{C}_{\text{base}} = \{C_1, C_2, C_3, C_4\}$ modela la totalidad de las leyes físicas, comerciales y operativas estipuladas por la empresa energética, sin recurrir a expresiones condicionales sobre el valor de variables de decisión:
 
 \begin{enumerate}
-    \item \textbf{Restricción de capacidad máxima de generación ($C_1$):} Ninguna central eléctrica puede superar su capacidad nominal diaria $Cap_i$ ni producir cantidades negativas:
+    \item \textbf{Restricción de capacidad máxima de generación ($C_1$):} Ninguna central eléctrica puede superar su capacidad de producción nominal diaria $Cap_i$:
     \begin{equation}
-        \forall i \in P, \; \forall j \in D: \quad 0 \le prod_{i,j} \le Cap_i
+        \forall i \in P, \; \forall j \in D: \quad prod_{i,j} \le Cap_i
         \label{eq:c1_capacidad}
     \end{equation}
 
-    \item \textbf{Restricción de garantía mínima de servicio y tope de demanda ($C_2$):} En cada día $j \in D$ y para cada cliente $s \in S$, la energía suministrada debe cubrir al menos el $G\%$ de su demanda estimada ($d^{\min}_{s,j}$) y no puede exceder el $100\%$ de la demanda solicitada ($d_{s,j}$):
+    \item \textbf{Restricción de garantía mínima de servicio y tope de demanda ($C_2$):} En cada día $j \in D$ y para cada cliente $s \in S$, la energía suministrada debe cubrir al menos el porcentaje $G\%$ de su demanda estimada ($d^{\min}_{s,j}$) y no puede exceder el $100\%$ de la demanda solicitada ($d_{s,j}$):
     \begin{equation}
         \forall s \in S, \; \forall j \in D: \quad d^{\min}_{s,j} \le vendido_{s,j} \le d_{s,j}
         \label{eq:c2_demanda}
     \end{equation}
-    \emph{Justificación formal de no reificación:} En una formulación ingenua podría intentarse introducir variables booleanas reificadas $total_{s,j} \iff (vendido_{s,j} = d_{s,j})$ y $parcial_{s,j} \iff (vendido_{s,j} \ge d^{\min}_{s,j})$ junto con la disyunción $total_{s,j} \lor parcial_{s,j}$. Sin embargo, dado que $G \in [0, 100]$, se cumple invariablemente que $d^{\min}_{s,j} \le d_{s,j}$, por lo cual el predicado $(vendido_{s,j} = d_{s,j})$ implica lógicamente $(vendido_{s,j} \ge d^{\min}_{s,j})$. Por absorción proposicional ($A \lor B \equiv B$ cuando $A \implies B$), la disyunción reificada colapsa exactamente en la desigualdad lineal incondicional $d^{\min}_{s,j} \le vendido_{s,j} \le d_{s,j}$ de la ecuación \eqref{eq:c2_demanda}, ahorrando $2mn$ variables booleanas y $3mn$ propagadores reificados.
+    \emph{Justificación formal de no reificación:} En una formulación inicial ingenua esta restricción se implementó introduciendo variables booleanas reificadas $total_{s,j} \iff (vendido_{s,j} = d_{s,j})$ y $parcial_{s,j} \iff (vendido_{s,j} \ge d^{\min}_{s,j})$ junto con la disyunción $total_{s,j} \lor parcial_{s,j}$. Sin embargo, dado que $G \in [0, 100]$, se cumple invariablemente que $d^{\min}_{s,j} \le d_{s,j}$, por lo cual el predicado $(vendido_{s,j} = d_{s,j})$ implica lógicamente $(vendido_{s,j} \ge d^{\min}_{s,j})$. Por absorción proposicional ($A \lor B \equiv B$ cuando $A \implies B$), la disyunción reificada colapsa exactamente en la desigualdad lineal incondicional $d^{\min}_{s,j} \le vendido_{s,j} \le d_{s,j}$ de la ecuación \eqref{eq:c2_demanda}, ahorrando $2mn$ variables booleanas y $3mn$ propagadores reificados.
 
-    \item \textbf{Restricción de cobertura energética diaria ($C_3$):} En ningún día $j \in D$ la suma de la energía vendida a los clientes puede exceder la energía total producida por el parque de centrales:
+    \item \textbf{Restricción de venta energética diaria ($C_3$):} En ningún día $j \in D$ la suma de la energía vendida a los clientes puede exceder la energía total producida por el parque de centrales:
     \begin{equation}
         \forall j \in D: \quad \sum_{s \in S} vendido_{s,j} \le \sum_{i \in P} prod_{i,j}
         \label{eq:c3_balance}
@@ -94,20 +124,21 @@ El conjunto de restricciones primarias $\mathcal{C}_{\text{base}} = \{C_1, C_2, 
         \forall i \in P \text{ con } 1 \le R_i \le n, \; \forall k \in \{1, \dots, n - R_i + 1\}: \quad \bigvee_{d=0}^{R_i - 1} \big( prod_{i, k+d} \le U_i \big)
         \label{eq:c4_regimen_alto}
     \end{equation}
-    la cual es lógicamente equivalente a la restricción de cardinalidad sobre indicadores de régimen alto $\sum_{d=0}^{R_i - 1} [\![ prod_{i, k+d} > U_i ]\!] \le R_i - 1$. Nótese que la formulación \eqref{eq:c4_regimen_alto} se aplica uniformemente a todas las centrales $i \in P$ y permite que el parámetro $R_i$ varíe libremente de una central a otra.
+    la cual es lógicamente equivalente a la restricción de cardinalidad sobre indicadores de régimen alto $\sum_{d=0}^{R_i - 1} [\![ prod_{i, k+d} > U_i ]\!] \le R_i - 1$. Nótese que la formulación \eqref{eq:c4_regimen_alto} se aplica uniformemente a todas las centrales $i \in P$ y permite que el parámetro $R_i$ varíe libremente de una central a otra en caso de que haya diferencias en la resistencia al desgaste entre una central y otra.
 \end{enumerate}
 
 \subsection{Modelado de la Función Objetivo y Adecuación del Modelo}
 
 El objetivo del proveedor energético es maximizar la ganancia neta acumulada $Z = ganancia$ en el horizonte de $n$ días, definida como la diferencia entre los ingresos totales percibidos por la venta de energía a cada cliente a su tarifa diferenciada $P_s$ y los costos totales de generación en cada central a su costo unitario $c_i$:
 \begin{equation}
-    \text{Maximizar } Z = ganancia = \sum_{j \in D} \sum_{s \in S} P_s \cdot vendido_{s,j} - \sum_{j \in D} \sum_{i \in P} c_i \cdot prod_{i,j}
+     Z(vendido, prod) = ganancia(vendido, prod) = \sum_{j \in D} \sum_{s \in S} P_s \cdot vendido_{s,j} - \sum_{j \in D} \sum_{i \in P} c_i \cdot prod_{i,j}
     \label{eq:funcion_objetivo}
 \end{equation}
 
 \paragraph{Justificación de adecuación al problema planteado.}
 La formulación $\langle \mathcal{X}, \mathcal{D}, \mathcal{C}_{\text{base}}, Z \rangle$ captura fielmente la naturaleza económico-operativa del despacho eléctrico:
 \begin{itemize}
-    \item \textbf{Flexibilidad estructural ($np, m, n$ arbitrarios):} Ninguna ecuación asume un número fijo de tres plantas. Al indexar sobre $P = \{1,\dots,np\}$, el modelo soporta sin modificación alguna tanto la contingencia de retiro de centrales ($np = 2$) como la expansión del parque a múltiples unidades convencionales o renovables ($np \in \{4, 5, 6, \dots\}$).
+    \item \textbf{Flexibilidad estructural ($np, m, n$ arbitrarios):} Ninguna ecuación asume un número fijo de tres plantas. Al indexar sobre $P = \{1,\dots,np\}$, el modelo soporta sin modificación alguna tanto la contingencia de retiro de centrales ($np = 2$) como la expansión del parque a múltiples unidades convencionales o renovables ($np \in \{4, 5, 6, \dots\}$). Además de la posibilidad de incluir nuevas clases de tecnologías de producción energética y especificar los costes de producción y capacidades máximas de producción para las centrales correspondientes.
+    
     \item \textbf{Racionamiento económico óptimo ante cuellos de botella:} Cuando las centrales de menor costo ($c_i < P_s$) alcanzan su límite de capacidad o deben reducir su carga a $U_i$ para evitar violar la ventana de régimen alto $C_4$, el modelo evalúa automáticamente la disyuntiva entre encender una central más costosa $i'$ o reducir el suministro del cliente $s$ hacia su piso garantizado $d^{\min}_{s,j}$: si $P_s > c_{i'}$, el margen marginal $(P_s - c_{i'}) > 0$ incentiva despachar la planta $i'$; si por el contrario $P_s < c_{i'}$, producir en $i'$ generaría una pérdida neta de $(c_{i'} - P_s)$ por cada MW adicional, por lo que la maximización de $Z$ recorta óptimamente la entrega de dicho cliente hasta el mínimo legal $d^{\min}_{s,j}$.
 \end{itemize}

@@ -110,7 +110,7 @@ var MIN_GAN..MAX_GAN: ganancia;
 
 % ---------------------- 5. Restricciones Primarias ---------------------------
 
-% C1: Limite de capacidad maxima diaria de cada planta (consistencia de nodo)
+% C1: Limite de capacidad maxima diaria de cada planta 
 constraint forall(i in 1..np, j in 1..n)(
   prod[i, j] <= plantas[i, 3]
 );
